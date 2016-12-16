@@ -43,15 +43,15 @@ let postgreSQL =  PostgreSQL.Database(
 )
 */
 
-drop.get("emp") { request in 
+drop.get("version") { request in 
 
 if let db = drop.database?.driver as? PostgreSQLDriver {
 
-let results = try db.raw("SELECT * from employee")
+let version = try db.raw("SELECT version()")
 
-print (results)
+print (version)
 
-return try JSON(node: results)
+return try JSON(node: version)
 
 } else {
 	return "No db connection"
