@@ -35,7 +35,7 @@ return "Invalid Paramater"
 
 }
 
-
+/*
 let postgreSQL =  PostgreSQL.Database(
     dbname: "voterzrdb",
     user: "postgres",
@@ -44,6 +44,7 @@ let postgreSQL =  PostgreSQL.Database(
 
 let connection = try postgreSQL.makeConnection()
 
+*/
 
 drop.get("version") { request in 
 
