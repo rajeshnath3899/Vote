@@ -64,11 +64,11 @@ return try JSON(node: version)
 }
 
 
-drop.get("result") { request in
+drop.get("empInfo") { request in
 
 if let db1 = drop.database?.driver as? PostgreSQLDriver {
 
-let results = try db1.raw("SELECT dept from employee")
+let results = try db1.raw("SELECT * from employee")
 
 print (results)
 
