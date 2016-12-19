@@ -1,5 +1,5 @@
 import Vapor
-//import PostgreSQL
+import PostgreSQL
 import VaporPostgreSQL
 
 let drop = Droplet( 
@@ -35,13 +35,15 @@ return "Invalid Paramater"
 
 }
 
-/*
+
 let postgreSQL =  PostgreSQL.Database(
     dbname: "voterzrdb",
     user: "postgres",
     password: "voteRZR123*_+"
 )
-*/
+
+let connection = try postgreSQL.makeConnection()
+
 
 drop.get("version") { request in 
 
@@ -59,6 +61,25 @@ return try JSON(node: version)
 }
 
 }
+
+
+drop.get("result") { request in
+
+if let db1 = drop.database?.driver as? PostgreSQLDriver {
+
+let results = try db1.raw("SELECT dept from employee")
+
+print (results)
+
+return try JSON(node: results)
+
+} else {
+        return "No db connection"
+
+}
+
+}
+
 drop.resource("posts", PostController())
 
 drop.run()
