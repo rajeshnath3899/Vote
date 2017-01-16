@@ -2,9 +2,17 @@ import Vapor
 import PostgreSQL
 import VaporPostgreSQL
 
+let drop = Droplet()
+
+try drop.addProvider(VaporPostgreSQL.Provider.self)
+
+/*
 let drop = Droplet( 
 	providers: [VaporPostgreSQL.Provider.self]
-)
+) */
+
+drop.preparations.append(Voter.self)
+
 
 drop.get { req in
     return try drop.view.make("welcome", [
@@ -81,6 +89,113 @@ return try JSON(node: results)
 
 }
 
-drop.resource("posts", PostController())
+struct QueryResult {
+    
+    var status: Bool
+    var errorMessage: String = ""
+    
+    init(){
+        
+        self.status = true
+        
+    }
+    
+    init(status: Bool, errorMessage: String) {
+        
+        self.status = status
+        self.errorMessage = errorMessage
+        
+    }
+    
+}
+
+	drop.post("voterzr/address-add") { request in
+
+		guard let address = request.json?["address"]?.string, let wardNo = request.json?["ward_no"]?.string, let wardName = request.json?["ward_name"]?.string else {
+	
+		throw Abort.badRequest
+
+	 }
+
+	 var queryResult = QueryResult()
+
+	/* Insert DB transaction */
+
+
+	if let dataBase = drop.database?.driver as? PostgreSQLDriver {
+
+
+	do {
+
+		let results = try dataBase.raw("INSERT INTO address(address_detail,ward_name,ward_no) VALUES ('\(address)', '\(wardName)', '\(wardNo)') RETURNING address_id")
+
+		
+	//	let value = results[0]
+			
+	//	print (value!["address_id"]!.double)
+
+		if let nodeObject = results[0], let nodeValue = nodeObject["address_id"], let intValue = nodeValue.int {
+
+		print (intValue)
+
+		return try JSON(node: ["status": queryResult.status,"address_id": intValue])
+
+		}
+
+
+		} catch {
+
+			let queryResult = QueryResult(status: false, errorMessage: "\(error)")
+
+			print ("Database Error : \(error)")
+	
+			return try JSON(node: ["status": queryResult.status,"errorMessage": queryResult.errorMessage])
+
+		}	
+	
+		}		
+
+		return try JSON(node: ["status": false]) 	
+	}
+
+
+	drop.post("voterzr/voter-add") { request in
+
+		guard let voterId = request.json?["voter_id"]?.string, let voterName = request.json?["voter_name"]?.string, let addressId = request.json?["address_id"]?.string, let leadId = request.json?["lead_id"]?.string  else {
+	
+		throw Abort.badRequest
+
+	 }
+
+	 var queryResult = QueryResult()
+
+	/* Insert DB transaction */
+
+
+	if let dataBase = drop.database?.driver as? PostgreSQLDriver {
+
+
+	do {
+
+		let results = try dataBase.raw("INSERT INTO voter(voter_id,voter_name,voter_address_id,lead_id) VALUES ('\(voterId)', '\(voterName)', '\(addressId)', '\(leadId)')")
+
+		return try JSON(node: ["status": queryResult.status])
+
+
+		} catch DatabaseError.invalidSQL(let message) {
+
+			let queryResult = QueryResult(status: false, errorMessage: message)
+
+//			print ("DatabaseError: \(message)")
+	
+			return try JSON(node: ["status": queryResult.status,"errorMessage": queryResult.errorMessage])
+
+		}	
+	
+		}		
+
+		return try JSON(node: ["status": false]) 	
+	}
+
 
 drop.run()
