@@ -1,6 +1,7 @@
 import Vapor
 import PostgreSQL
 import VaporPostgreSQL
+import Foundation
 
 let drop = Droplet()
 
@@ -184,12 +185,30 @@ struct QueryResult {
 
 		} catch DatabaseError.invalidSQL(let message) {
 
-			let queryResult = QueryResult(status: false, errorMessage: message)
 
-//			print ("DatabaseError: \(message)")
+			if let extractedMessage = Utility.getSubstringFromMessage(text: message) {
+
+			let queryResult = QueryResult(status: false, errorMessage: extractedMessage) 
+
+			print ("DatabaseError: \(extractedMessage)")
 	
+			return try JSON(node: ["status": queryResult.status,"errorMessage": queryResult.errorMessage]) } else {
+			
+			let queryResult = QueryResult(status: false, errorMessage: "DatabaseError")
+
+			return try JSON(node: ["status": queryResult.status,"errorMessage": queryResult.errorMessage]) 
+			
+			
+			}
+
+		} catch {
+
+			 let queryResult = QueryResult(status: false, errorMessage: "\(error)")
+			 print ("DatabaseError: \(error)")
 			return try JSON(node: ["status": queryResult.status,"errorMessage": queryResult.errorMessage])
 
+			
+			
 		}	
 	
 		}		
@@ -197,5 +216,5 @@ struct QueryResult {
 		return try JSON(node: ["status": false]) 	
 	}
 
-
 drop.run()
+
