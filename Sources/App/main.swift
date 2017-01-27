@@ -2,6 +2,8 @@ import Vapor
 import PostgreSQL
 import VaporPostgreSQL
 import Foundation
+import Fluent
+import HTTP
 
 let drop = Droplet()
 
@@ -12,7 +14,7 @@ let drop = Droplet(
 	providers: [VaporPostgreSQL.Provider.self]
 ) */
 
-drop.preparations.append(Voter.self)
+//drop.preparations.append(Voter.self)
 
 
 drop.get { req in
@@ -130,19 +132,15 @@ struct QueryResult {
 
 		let results = try dataBase.raw("INSERT INTO address(address_detail,ward_name,ward_no) VALUES ('\(address)', '\(wardName)', '\(wardNo)') RETURNING address_id")
 
+		guard let addressID = results[0]?["address_id"]?.int else { throw Abort.badRequest }
 		
-	//	let value = results[0]
-			
-	//	print (value!["address_id"]!.double)
+		print ("the addressID is \(addressID)")
+		/*		
+		if let nodeObject = results[0],
+		let nodeValue = nodeObject["address_id"], 
+		let intValue = nodeValue.int { } */
 
-		if let nodeObject = results[0], let nodeValue = nodeObject["address_id"], let intValue = nodeValue.int {
-
-		print (intValue)
-
-		return try JSON(node: ["status": queryResult.status,"address_id": intValue])
-
-		}
-
+		return try JSON(node: ["status": queryResult.status,"address_id": addressID])
 
 		} catch {
 
@@ -162,7 +160,10 @@ struct QueryResult {
 
 	drop.post("voterzr/voter-add") { request in
 
-		guard let voterId = request.json?["voter_id"]?.string, let voterName = request.json?["voter_name"]?.string, let addressId = request.json?["address_id"]?.string, let leadId = request.json?["lead_id"]?.string  else {
+		guard let voterId = request.json?["voter_id"]?.string,
+		      let voterName = request.json?["voter_name"]?.string,
+		      let addressId = request.json?["address_id"]?.string,
+		      let leadId = request.json?["lead_id"]?.string  else {
 	
 		throw Abort.badRequest
 
@@ -198,7 +199,6 @@ struct QueryResult {
 
 			return try JSON(node: ["status": queryResult.status,"errorMessage": queryResult.errorMessage]) 
 			
-			
 			}
 
 		} catch {
@@ -215,6 +215,187 @@ struct QueryResult {
 
 		return try JSON(node: ["status": false]) 	
 	}
+
+
+struct Member {
+	
+        let voterId: String
+        let voterName: String
+        let familyRole: String
+}
+
+extension Member: NodeRepresentable {
+   
+	func makeNode() throws -> Node {
+    		return try Node(node:
+      	[
+        	"voterId": voterId,
+        	"voterName": voterName,
+        	"familyRole": familyRole
+      	]
+    	)
+  }
+
+	func makeNode(context: Context) throws -> Node {
+        return try Node(node: [       
+                "voterId": voterId,
+                "voterName": voterName,
+                "familyRole": familyRole
+        ])
+    }
+
+}
+
+
+struct Voter {
+
+	let voterId: String
+        let name: String
+        let role: String
+        let address: String
+        let wardNo: String
+        let wardName: String
+        let member: Node
+       
+}
+
+extension Voter: NodeRepresentable {
+    
+func makeNode() throws -> Node {
+    return try Node(node:
+      [
+        "leadVoterId": voterId,
+        "name": name,
+        "role": role,
+	"address": address,
+	"wardNo": wardNo,
+	"wardName": wardName,
+	"member": member
+      ]
+    )
+  }
+
+func makeNode(context: Context) throws -> Node {
+
+	return try Node(node:
+      	[
+        "leadVoterId": voterId,
+        "name": name,
+        "role": role,
+        "address": address,
+        "wardNo": wardNo,
+        "wardName": wardName,
+        "member": member
+      	]
+    	)
+}
+
+}
+
+
+func fetchMembersFor(voterId: String, withLimit limit: Int, andwithOffset offset: Int)->[Member]? {
+
+        if let db1 = drop.database?.driver as? PostgreSQLDriver {
+
+        do { let results = try db1.raw("SELECT voter.voter_id, voter.voter_name, voter.role FROM voter INNER JOIN address ON voter.voter_address_id= address.address_id WHERE voter.lead_id = '\(voterId)' LIMIT \(limit) OFFSET \(offset)")
+
+	/* guard let addressID = results[0]?["address_id"]?.int else { throw Abort.badRequest } */
+
+	var members:[Member] = []
+	
+	for i in 0..<(results.array)!.count {
+
+	guard let id = results[i]?["voter_id"]?.string, 
+	let name = results[i]?["voter_name"]?.string,
+	let role = results[i]?["role"]?.string else { throw Abort.badRequest }
+	
+	let member = Member(voterId: id, voterName: name, familyRole: role)
+
+	members.append(member)
+
+	/* print("the value is \(i)") */
+
+	}
+
+	return members
+
+                } catch { print("the error is : \(error)") }
+
+
+        }
+
+
+	return nil
+}
+
+
+	drop.post("voterzr/voter-list") { request in
+
+		guard let limit = request.json?["limit"]?.int,
+		let offset = request.json?["offset"]?.int else { throw Abort.badRequest }	
+
+		if let voterDb = drop.database?.driver as? PostgreSQLDriver {
+
+		do {
+
+		let results = try voterDb.raw("SELECT voter_id, voter_name, role, address.address_detail, address.ward_no, address.ward_name  FROM voter INNER JOIN address ON voter.voter_address_id = address.address_id WHERE lead_id='-1' LIMIT \(limit) OFFSET \(offset)")
+
+		/*print ("The result is \(results)")*/
+
+		/*var voters = [[String:Any?]]() */
+
+		var voters:[Voter] = []
+
+		for i in 0..<(results.array)!.count {
+        
+        		guard var id = results[i]?["voter_id"]?.string,
+			var name = results[i]?["voter_name"]?.string, 
+			var role = results[i]?["role"]?.string,
+			var address = results[i]?["address_detail"]?.string,
+			var wardNo = results[i]?["ward_no"]?.string,
+			var wardName = results[i]?["ward_name"]?.string
+		  
+			else { throw Abort.badRequest }
+
+			var familyMembers = fetchMembersFor(voterId: id, 
+							    withLimit: limit, 
+							    andwithOffset: offset)
+			
+			guard let members = familyMembers else { throw Abort.badRequest } 
+			/* print("the members are \(members)")*/
+
+			var voter = Voter(voterId: id, name: name,
+					  role: role, address: address,
+					  wardNo: wardNo,
+					  wardName: wardName,
+					  member:try members.makeNode())
+			voters.append(voter)
+
+			/*print("the voters are \(voters)")*/
+			}
+			
+			 return try JSON(node: ["voters":try voters.makeNode()])
+			
+			 
+        	} catch {
+		
+		let queryResult = QueryResult(status: false, errorMessage: "\(error)")
+                         print ("DatabaseError: \(error)")
+                        return try JSON(node: ["status": queryResult.status,
+					       "errorMessage": queryResult.errorMessage])
+		}
+
+		} else {
+        	
+		let queryResult = QueryResult(status: false, errorMessage: "Connection Error")
+                	print ("Connection Error")
+			return try JSON(node: ["status": queryResult.status,
+					       "errorMessage": queryResult.errorMessage])
+
+		}		
+
+	}
+
 
 drop.run()
 
