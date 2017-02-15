@@ -160,6 +160,40 @@ struct QueryResult {
 
 	drop.post("voterzr/voter-add") { request in
 
+
+	/*guard let members = request.data["voters","members"]?.array else {
+
+	throw Abort.badRequest
+
+	}*/ 
+
+	guard let members = request.data["voters","members"]?.array, let leadVoterId = request.json?["voters","leadVoterId"]?.string, let addressId = request.json?["voters","addressId"]?.int, let leadRole = request.json?["voters","leadRole"]?.string
+	else {
+
+	throw Abort.badRequest
+	}
+
+
+	/*guard let addressId = request.json?["voters","addressId"]?.int
+        else {
+        
+        throw Abort.badRequest
+        }*/
+
+	/*for i in 0..<members.count {
+
+	guard var voterId = request.json?["voters","members",i,"voterId"],var name = request.json?["voters","members",i,"name"], var role = request.json?["voters","members",i,"memberRole"] else {
+ 
+         throw Abort.badRequest
+ 
+         }
+
+	print(voterId.string!)
+
+	} 
+
+	 print ("\(members.count)")
+
 		guard let voterId = request.json?["voter_id"]?.string,
 		      let voterName = request.json?["voter_name"]?.string,
 		      let addressId = request.json?["address_id"]?.string,
@@ -167,8 +201,9 @@ struct QueryResult {
 	
 		throw Abort.badRequest
 
-	 }
-
+	 } */
+		
+	
 	 var queryResult = QueryResult()
 
 	/* Insert DB transaction */
@@ -179,13 +214,28 @@ struct QueryResult {
 
 	do {
 
-		let results = try dataBase.raw("INSERT INTO voter(voter_id,voter_name,voter_address_id,lead_id) VALUES ('\(voterId)', '\(voterName)', '\(addressId)', '\(leadId)')")
+		print ("\(members.count)")
+		 for i in 0..<members.count {
+        
+        guard var voterId = request.json?["voters","members",i,"voterId"],var voterName = request.json?["voters","members",i,"name"], var memberRole = request.json?["voters","members",i,"memberRole"] else {
+ 
+         throw Abort.badRequest
+         
+         }
+         
+		print ("\(voterId.string!),\(voterName.string!),\(addressId),\(leadVoterId),\(leadRole),\(memberRole.string!)")
 
-		return try JSON(node: ["status": queryResult.status])
+		var results = try dataBase.raw("INSERT INTO voter(voter_id,voter_name,voter_address_id,lead_id,lead_role,member_role) VALUES ('\(voterId.string!)','\(voterName.string!)', '\(addressId)', '\(leadVoterId)','\(leadRole.string!)','\(memberRole.string!)')")
 
+		/*return try JSON(node: ["status": queryResult.status])*/
+
+		}
+
+		 return try JSON(node: ["status": queryResult.status])
 
 		} catch DatabaseError.invalidSQL(let message) {
 
+		print ("In invalid SQL")
 
 			if let extractedMessage = Utility.getSubstringFromMessage(text: message) {
 
@@ -203,6 +253,7 @@ struct QueryResult {
 
 		} catch {
 
+			 print ("default catch")
 			 let queryResult = QueryResult(status: false, errorMessage: "\(error)")
 			 print ("DatabaseError: \(error)")
 			return try JSON(node: ["status": queryResult.status,"errorMessage": queryResult.errorMessage])
