@@ -189,19 +189,20 @@ struct QueryResult {
 
 	/* inserting the lead voter Info into lead_voter table */
 
+	var results = try dataBase.raw("INSERT INTO address(address_detail,ward_name,ward_no) VALUES ('\(address)', '\(wardName)', '\(wardNo)') RETURNING address_id")
+
+          guard let addressId = results[0]?["address_id"]?.int else { throw Abort.badRequest }
+
+          print ("address id \(addressId)")
+
+
 	print ("Before add lead_voter")
 
-	 _  = try dataBase.raw("INSERT INTO lead_voter(lead_voter_id,lead_name,lead_role) VALUES ('\(leadVoterId)', '\(leadName)','\(leadRole)')")
+	 _  = try dataBase.raw("INSERT INTO lead_voter(lead_voter_id,lead_name,lead_role,lead_voter_address_id) VALUES ('\(leadVoterId)', '\(leadName)','\(leadRole)','\(addressId)')")
 
 	 print ("after add lead_voter")
 	/* inserting the address into address table */
 
-	 let results = try dataBase.raw("INSERT INTO address(address_detail,ward_name,ward_no) VALUES ('\(address)', '\(wardName)', '\(wardNo)') RETURNING address_id")
-
-          guard let addressId = results[0]?["address_id"]?.int else { throw Abort.badRequest }
-
-	  print ("address id \(addressId)")
-	
        	  print ("\(members.count)")
 		 for i in 0..<members.count {
         
@@ -215,7 +216,7 @@ struct QueryResult {
 
 		/* Inserting voter info into voter table */
 
-		var results = try dataBase.raw("INSERT INTO voter(voter_id,voter_name,voter_address_id,voter_lead_id,member_role) VALUES ('\(voterId.string!)','\(voterName.string!)', '\(addressId)', '\(leadVoterId)','\(memberRole.string!)')")
+		var results = try dataBase.raw("INSERT INTO voter(voter_id,voter_name,voter_lead_id,member_role) VALUES ('\(voterId.string!)','\(voterName.string!)','\(leadVoterId)','\(memberRole.string!)')")
 
 
 		}
@@ -305,8 +306,8 @@ func makeNode() throws -> Node {
     return try Node(node:
       [
         "leadVoterId": voterId,
-        "name": name,
-        "role": role,
+        "leadName": name,
+        "leadRole": role,
 	"address": address,
 	"wardNo": wardNo,
 	"wardName": wardName,
@@ -332,12 +333,11 @@ func makeNode(context: Context) throws -> Node {
 
 }
 
-
 func fetchMembersFor(voterId: String, withLimit limit: Int, andwithOffset offset: Int)->[Member]? {
 
         if let db1 = drop.database?.driver as? PostgreSQLDriver {
 
-        do { let results = try db1.raw("SELECT voter.voter_id, voter.voter_name, voter.role FROM voter INNER JOIN address ON voter.voter_address_id= address.address_id WHERE voter.lead_id = '\(voterId)' LIMIT \(limit) OFFSET \(offset)")
+        do { let results = try db1.raw("SELECT voter.voter_id, voter.voter_name, voter.member_role FROM voter WHERE voter.voter_lead_id = '\(voterId)' LIMIT \(limit) OFFSET \(offset)")
 
 	/* guard let addressID = results[0]?["address_id"]?.int else { throw Abort.badRequest } */
 
@@ -347,7 +347,7 @@ func fetchMembersFor(voterId: String, withLimit limit: Int, andwithOffset offset
 
 	guard let id = results[i]?["voter_id"]?.string, 
 	let name = results[i]?["voter_name"]?.string,
-	let role = results[i]?["role"]?.string else { throw Abort.badRequest }
+	let role = results[i]?["member_role"]?.string else { throw Abort.badRequest }
 	
 	let member = Member(voterId: id, voterName: name, familyRole: role)
 
@@ -368,21 +368,6 @@ func fetchMembersFor(voterId: String, withLimit limit: Int, andwithOffset offset
 	return nil
 }
 
-/*	drop.get("voterrzr/lead-voter-list") { request in
-
-
-	if let voterDb = drop.database?.driver as? PostgreSQLDriver {
-
-                do {
-
-
-
-	}
-
-	}
-
-*/
-
 	drop.post("voterzr/voter-list") { request in
 
 		guard let limit = request.json?["limit"]?.int,
@@ -392,7 +377,11 @@ func fetchMembersFor(voterId: String, withLimit limit: Int, andwithOffset offset
 
 		do {
 
-		let results = try voterDb.raw("SELECT voter_id, voter_name, role, address.address_detail, address.ward_no, address.ward_name  FROM voter INNER JOIN address ON voter.voter_address_id = address.address_id WHERE lead_id='-1' LIMIT \(limit) OFFSET \(offset)")
+		/*let results = try voterDb.raw("SELECT * from lead_voter LIMIT \(limit) OFFSET \(offset)")
+		print ("The result is \(results)")*/		
+		
+	
+		let results = try voterDb.raw("SELECT lead_voter_id, lead_name, lead_role, address.address_detail, address.ward_no, address.ward_name  FROM lead_voter INNER JOIN address ON lead_voter.lead_voter_address_id = address.address_id LIMIT \(limit) OFFSET \(offset)")
 
 		/*print ("The result is \(results)")*/
 
@@ -402,9 +391,9 @@ func fetchMembersFor(voterId: String, withLimit limit: Int, andwithOffset offset
 
 		for i in 0..<(results.array)!.count {
         
-        		guard var id = results[i]?["voter_id"]?.string,
-			var name = results[i]?["voter_name"]?.string, 
-			var role = results[i]?["role"]?.string,
+        		guard var id = results[i]?["lead_voter_id"]?.string,
+			var name = results[i]?["lead_name"]?.string, 
+			var role = results[i]?["lead_role"]?.string,
 			var address = results[i]?["address_detail"]?.string,
 			var wardNo = results[i]?["ward_no"]?.string,
 			var wardName = results[i]?["ward_name"]?.string
@@ -428,9 +417,8 @@ func fetchMembersFor(voterId: String, withLimit limit: Int, andwithOffset offset
 			/*print("the voters are \(voters)")*/
 			}
 			
-			 return try JSON(node: ["voters":try voters.makeNode()])
-			
-			 
+			 return try JSON(node: ["voters":try voters.makeNode()])	
+
         	} catch {
 		
 		let queryResult = QueryResult(status: false, errorMessage: "\(error)")
