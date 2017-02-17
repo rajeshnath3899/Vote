@@ -161,49 +161,22 @@ struct QueryResult {
 	drop.post("voterzr/voter-add") { request in
 
 
-	/*guard let members = request.data["voters","members"]?.array else {
+	/* extracting the address from request */
 
-	throw Abort.badRequest
+	 guard let address = request.json?["voters","address"]?.string, let wardNo = request.json?["voters","wardNo"]?.string, let wardName = request.json?["voters","wardName"]?.string else {
 
-	}*/ 
+          throw Abort.badRequest
 
-	guard let members = request.data["voters","members"]?.array, let leadVoterId = request.json?["voters","leadVoterId"]?.string, let addressId = request.json?["voters","addressId"]?.int, let leadRole = request.json?["voters","leadRole"]?.string
+         }
+
+	/* extracting the voter details from request */
+
+	guard let members = request.data["voters","members"]?.array, let leadVoterId = request.json?["voters","leadVoterId"]?.string, let leadRole = request.json?["voters","leadRole"]?.string, let leadName = request.json?["voters","leadName"]?.string
 	else {
 
 	throw Abort.badRequest
 	}
 
-
-	/*guard let addressId = request.json?["voters","addressId"]?.int
-        else {
-        
-        throw Abort.badRequest
-        }*/
-
-	/*for i in 0..<members.count {
-
-	guard var voterId = request.json?["voters","members",i,"voterId"],var name = request.json?["voters","members",i,"name"], var role = request.json?["voters","members",i,"memberRole"] else {
- 
-         throw Abort.badRequest
- 
-         }
-
-	print(voterId.string!)
-
-	} 
-
-	 print ("\(members.count)")
-
-		guard let voterId = request.json?["voter_id"]?.string,
-		      let voterName = request.json?["voter_name"]?.string,
-		      let addressId = request.json?["address_id"]?.string,
-		      let leadId = request.json?["lead_id"]?.string  else {
-	
-		throw Abort.badRequest
-
-	 } */
-		
-	
 	 var queryResult = QueryResult()
 
 	/* Insert DB transaction */
@@ -214,7 +187,22 @@ struct QueryResult {
 
 	do {
 
-		print ("\(members.count)")
+	/* inserting the lead voter Info into lead_voter table */
+
+	print ("Before add lead_voter")
+
+	 _  = try dataBase.raw("INSERT INTO lead_voter(lead_voter_id,lead_name,lead_role) VALUES ('\(leadVoterId)', '\(leadName)','\(leadRole)')")
+
+	 print ("after add lead_voter")
+	/* inserting the address into address table */
+
+	 let results = try dataBase.raw("INSERT INTO address(address_detail,ward_name,ward_no) VALUES ('\(address)', '\(wardName)', '\(wardNo)') RETURNING address_id")
+
+          guard let addressId = results[0]?["address_id"]?.int else { throw Abort.badRequest }
+
+	  print ("address id \(addressId)")
+	
+       	  print ("\(members.count)")
 		 for i in 0..<members.count {
         
         guard var voterId = request.json?["voters","members",i,"voterId"],var voterName = request.json?["voters","members",i,"name"], var memberRole = request.json?["voters","members",i,"memberRole"] else {
@@ -225,9 +213,10 @@ struct QueryResult {
          
 		print ("\(voterId.string!),\(voterName.string!),\(addressId),\(leadVoterId),\(leadRole),\(memberRole.string!)")
 
-		var results = try dataBase.raw("INSERT INTO voter(voter_id,voter_name,voter_address_id,lead_id,lead_role,member_role) VALUES ('\(voterId.string!)','\(voterName.string!)', '\(addressId)', '\(leadVoterId)','\(leadRole.string!)','\(memberRole.string!)')")
+		/* Inserting voter info into voter table */
 
-		/*return try JSON(node: ["status": queryResult.status])*/
+		var results = try dataBase.raw("INSERT INTO voter(voter_id,voter_name,voter_address_id,voter_lead_id,member_role) VALUES ('\(voterId.string!)','\(voterName.string!)', '\(addressId)', '\(leadVoterId)','\(memberRole.string!)')")
+
 
 		}
 
@@ -379,6 +368,20 @@ func fetchMembersFor(voterId: String, withLimit limit: Int, andwithOffset offset
 	return nil
 }
 
+/*	drop.get("voterrzr/lead-voter-list") { request in
+
+
+	if let voterDb = drop.database?.driver as? PostgreSQLDriver {
+
+                do {
+
+
+
+	}
+
+	}
+
+*/
 
 	drop.post("voterzr/voter-list") { request in
 
