@@ -165,6 +165,7 @@ struct QueryResult {
 
 	 guard let address = request.json?["voters","address"]?.string, let wardNo = request.json?["voters","wardNo"]?.string, let wardName = request.json?["voters","wardName"]?.string else {
 
+	  print ("in voter-add")
           throw Abort.badRequest
 
          }
@@ -208,7 +209,8 @@ struct QueryResult {
         
         guard var voterId = request.json?["voters","members",i,"voterId"],var voterName = request.json?["voters","members",i,"name"], var memberRole = request.json?["voters","members",i,"memberRole"] else {
  
-         throw Abort.badRequest
+        print ("in itrating members") 
+	throw Abort.badRequest
          
          }
          
